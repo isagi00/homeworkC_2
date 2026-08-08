@@ -50,38 +50,49 @@ int main(void){
     }
     printf("coordinator in ascolto sulla porta %d... \n", PORT);
 
-    //accept(), accetta connessioni arrivate al socket.
-    int client_fd = accept(listen_fd, NULL, NULL);
-    if (client_fd < 0){
-        perror("server accept() fallito");
-        exit(4);
-    }
-    printf("accettato connessione client fd = %d\n", client_fd);
 
 
-    //recv(), riceve il messaggio msg dal client_fd
-    struct msg m;
-    ssize_t n = recv(client_fd, &m, sizeof(m), 0);
-    if (n == sizeof(m)){    //tutto ok
-        printf("ricevuto messaggio da client fd = %d \n", client_fd);
-        //crea timestamp e scrivi nel log
-        FILE *f = fopen(LOG_FILE, "a");
-        if (f){
-            time_t now = time(NULL); //timestamp unix corrente
-            char ts_buffer[64];
-            strftime(ts_buffer, sizeof(ts_buffer), "%d-%m-%Y %H:%M:%S", localtime(&now)); //formatta secondo "%d-%m-%Y %H:%M:%S"
-            fprintf(f, "[%s, %d, %.2f]\n", ts_buffer, m.id_mittente, m.dato);
-            fclose(f);
+    while (1){ //loop per continuare ad accettare connessioni
+        //accept(), accetta connessioni arrivate al socket.
+        int client_fd = accept(listen_fd, NULL, NULL);
+        if (client_fd < 0){
+            perror("server accept() fallito");
+            continue;   //se accept fallisce prova con la prossima connessione
         }
-    }
-    // else if (n == 0) {  //client disconnesso
-    //     printf("client disconnesso \n");
-    // }
-    // else if (n < 0){
-    //     printf("errore ricezione messaggio o dati parziali \n");
-    // }
+        printf("accettato connessione client fd = %d\n", client_fd);
 
-    close(client_fd);
+
+        //recv(), riceve il messaggio msg dal client_fd
+        struct msg m;
+        ssize_t n = recv(client_fd, &m, sizeof(m), 0);
+        if (n == sizeof(m)){    //tutto ok
+            printf("ricevuto messaggio da client fd = %d \n", client_fd);
+            //crea timestamp e scrivi nel log
+            FILE *f = fopen(LOG_FILE, "a");
+            if (f){
+                time_t now = time(NULL); //timestamp unix corrente
+                char ts_buffer[64];
+                strftime(ts_buffer, sizeof(ts_buffer), "%d-%m-%Y %H:%M:%S", localtime(&now)); //formatta secondo "%d-%m-%Y %H:%M:%S"
+                fprintf(f, "[%s, %d, %.2f]\n", ts_buffer, m.id_mittente, m.dato);
+                fclose(f);
+            }
+            else{
+                perror("server fopen log fallito");
+            }
+        }
+        else if (n == 0) {  //client disconnesso
+            printf("client fd = %d disconnesso senza inviare dati\n", client_fd);
+        }
+        else if (n < 0){
+            printf("server revc fallito o dati parziali \n");
+        }
+
+        close(client_fd);   //chiusura connessione di client fd
+    }
+
+
     close(listen_fd);
     return 0;
 }
+
+
