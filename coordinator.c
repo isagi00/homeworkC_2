@@ -14,6 +14,8 @@ direttore di orchestra.
 
 #include <sys/socket.h> //creazione socket, bind, listen ... 
 #include <stdio.h>  //util
+#include <stdlib.h> //util
+#include <unistd.h> //util
 #include <netinet/in.h> //preparazione indirizzo
 #include <time.h> //per timestamp
 
