@@ -39,6 +39,8 @@ int main(void){
         perror("server bind() fallito");
         exit(2);
     }
+    printf("server port: %d \n", addr.sin_port);
+    printf("server ip: %d \n", addr.sin_addr.s_addr);
 
     //listen(), mette in ascolto il socket.
     int max_connessioni_in_attesa = 5;
@@ -54,11 +56,14 @@ int main(void){
         perror("server accept() fallito");
         exit(4);
     }
+    printf("accettato connessione client fd = %d\n", client_fd);
+
 
     //recv(), riceve il messaggio msg dal client_fd
     struct msg m;
-    int n = recv(client_fd, &m, sizeof(m), 0);
+    ssize_t n = recv(client_fd, &m, sizeof(m), 0);
     if (n == sizeof(m)){    //tutto ok
+        printf("ricevuto messaggio da client fd = %d \n", client_fd);
         //crea timestamp e scrivi nel log
         FILE *f = fopen(LOG_FILE, "a");
         if (f){

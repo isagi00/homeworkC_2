@@ -29,6 +29,7 @@ int main(int argc, char* argv[]){
         perror("client socket() fallito");
         exit(1);
     }
+    printf("client socket creato correttamente. fd = %d \n", sock_fd);
 
     //costruzione indirizzo
     struct sockaddr_in addr = {0};
@@ -36,14 +37,14 @@ int main(int argc, char* argv[]){
     addr.sin_port = htons(PORT);
     char localhost_ip[] = "127.0.0.1";
     inet_pton(AF_INET, localhost_ip, &addr.sin_addr); //conversione ip numerico in binario
-
+     
 
     //connessione
     if ( connect(sock_fd, (struct sockaddr*)  &addr, sizeof(addr)) < 0){
         perror("client connect() fallito");
         exit(2);
     }
-
+    printf("client fd [%d] connesso su porta %d con ip %s \n", sock_fd, addr.sin_port, localhost_ip);
     //costruisci messaggio
     struct msg m;
     m.id_mittente = atoi(argv[1]);
@@ -51,7 +52,7 @@ int main(int argc, char* argv[]){
 
     //manda
     send(sock_fd, &m, sizeof(m), 0);
-
+    printf("client fd [%d] mandato un messaggio \n", sock_fd);
 
     close(sock_fd);
     return 0;
