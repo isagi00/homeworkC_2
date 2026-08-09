@@ -38,6 +38,11 @@ int main(void){
     addr.sin_addr.s_addr = INADDR_ANY;  // indirizzo ip su cui il server ascolterà. IDADDR_ANY = 0.0.0.0
     addr.sin_port = htons(PORT); //porta su cui server sta in ascolto. htons() = host to network short, converte la porta al formato della rete.
 
+    // //SO_REUSEADDR, riutilizzo porta e indirizzo
+    int opt = 1; //abilita SO_REUSEADDR
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+
     //bind(), assegna porta + indirizzo al socket.
     if ( bind(listen_fd, (struct sockaddr*) &addr, sizeof(addr)) < 0){
         perror("server bind() fallito");
