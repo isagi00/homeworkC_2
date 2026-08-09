@@ -11,66 +11,17 @@ direttore di orchestra.
 */
 
 #include "common.h"
+#include "worker.h"
 
 #include <stdio.h>  //util
 #include <stdlib.h> //util
 #include <unistd.h> //util
 
+
 #include <sys/socket.h> //creazione socket, bind, listen ... 
 #include <netinet/in.h> //preparazione indirizzo
-#include <time.h> //per timestamp
 
 #include <pthread.h>
-
-/*
-pthread_mutex_t: tipo di dato, mutex che permette a un solo thread alla volta di accedere in una sezione critica.
-PTHREAD_MUTEX_INITIALIZER: macro, inizializza un mutex con valori di default.
-*/
-pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER; //chiave per lock.
-
-void write_log(int id_mittente, double dato){
-    //lock
-    pthread_mutex_lock(&log_mutex);
-
-    //crea timestamp e scrivi nel log
-        FILE *f = fopen(LOG_FILE, "a");
-        if (f){
-            time_t now = time(NULL); //timestamp unix corrente
-            char ts_buffer[64];
-            strftime(ts_buffer, sizeof(ts_buffer), "%d-%m-%Y %H:%M:%S", localtime(&now)); //formatta secondo "%d-%m-%Y %H:%M:%S"
-            fprintf(f, "[%s, %d, %.2f]\n", ts_buffer, id_mittente, dato);
-            fclose(f);
-        }
-        else{
-            perror("server fopen log fallito");
-        }
-    //unlock
-    pthread_mutex_unlock(&log_mutex);
-}
-
-void* handle_client(void* arg){
-    int client_fd = *(int*) arg; //cast di arg in int, poi prendi il contenuto
-    free(arg);  //libera memoria allocata in main, non serve
-
-    //ricevi messaggio
-    struct msg m;
-    ssize_t n = recv(client_fd, &m, sizeof(m), 0);
-
-    if (n == sizeof(m)){
-        write_log(m.id_mittente, m.dato);
-    }
-    else if (n == 0) {  //client disconnesso
-        printf("client fd = %d disconnesso senza inviare dati\n", client_fd);
-    }
-    else if (n < 0){
-        printf("server revc fallito o dati parziali \n");
-    }
-    close(client_fd);
-    return NULL;
-}
-
-
-
 
 int main(void){
     //creazione socket lato server, sempre in ascolto
@@ -133,10 +84,8 @@ int main(void){
         }
         printf("creato thread %p per il client fd %d\n", (void *)tid, client_fd);
         
-        //libera risorse thread dopo aver terminato
+        //libera risorse usate dal thread dopo aver terminato
         pthread_detach(tid); 
-
-
     }
 
 
