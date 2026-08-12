@@ -51,8 +51,23 @@ int main(int argc, char* argv[]){
     m.dato = atof(argv[2]);
 
     //manda
-    send(sock_fd, &m, sizeof(m), 0);
+     send(sock_fd, &m, sizeof(m), 0);
     printf("client fd [%d] mandato un messaggio \n", sock_fd);
+
+    // ricevi la conferma (ACK) dal coordinatore
+    char risposta[16];
+    ssize_t n = recv(sock_fd, risposta, sizeof(risposta) - 1, 0);
+
+    if (n > 0){
+        risposta[n] = '\0';
+        printf("client fd [%d] ricevuto ACK: %s\n", sock_fd, risposta);
+    }
+    else if (n == 0){
+        printf("client fd [%d] coordinatore ha chiuso la connessione senza rispondere\n", sock_fd);
+    }
+    else{
+        perror("client recv() fallita");
+    }
 
     close(sock_fd);
     return 0;

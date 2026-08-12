@@ -21,12 +21,63 @@ direttore di orchestra.
 #include <time.h> //per timestamp
 
 #include <pthread.h>
-
+#include <signal.h>
+#include <string.h>
+#include <sys/stat.h>
 /*
 pthread_mutex_t: tipo di dato, mutex che permette a un solo thread alla volta di accedere in una sezione critica.
 PTHREAD_MUTEX_INITIALIZER: macro, inizializza un mutex con valori di default.
 */
 pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER; //chiave per lock.
+
+#define max_Byte 1000
+
+void singalarm(int signo){
+    pthread_mutex_lock(&log_mutex);
+
+    struct stat info_file;
+
+    if(stat(LOG_FILE, &info_file) == 0){
+        if(info_file.st_size >= max_Byte){
+            printf("%ld su %d\n", info_file.st_size, max_Byte);
+            char buffer[100];
+            time_t now = time(NULL);
+            strftime(buffer, sizeof(buffer), "%d-%m-%Y_%H-%M-%S", localtime(&now));
+            char nuovo_nome[150];
+            snprintf(nuovo_nome, sizeof(nuovo_nome), "./logs/log_%s.txt", buffer);
+            rename(LOG_FILE, nuovo_nome);
+        }
+        else{
+            printf("%ld su %d , crea nuova file\n", info_file.st_size, max_Byte);
+        }
+    }
+    else{
+        printf("errore lettura byte file\n");
+    }
+
+    pthread_mutex_unlock(&log_mutex);
+    alarm(5);
+}
+
+void write_log_dis(int id_mittente){
+    //lock
+    pthread_mutex_lock(&log_mutex);
+
+    //crea timestamp e scrivi nel log
+    FILE *f = fopen(LOG_FILE, "a");
+    if (f){
+        time_t now = time(NULL); //timestamp unix corrente
+        char ts_buffer[64];
+        strftime(ts_buffer, sizeof(ts_buffer), "%d-%m-%Y %H:%M:%S", localtime(&now)); //formatta secondo "%d-%m-%Y %H:%M:%S"
+        fprintf(f, "[%s, %d, %s]\n", ts_buffer, id_mittente, "DISCONNECT");
+        fclose(f);
+    }
+    else{
+        perror("server fopen log fallito");
+    }
+    //unlock
+    pthread_mutex_unlock(&log_mutex);
+}
 
 void write_log(int id_mittente, double dato){
     //lock
@@ -55,9 +106,17 @@ void* handle_client(void* arg){
     //ricevi messaggio
     struct msg m;
     ssize_t n = recv(client_fd, &m, sizeof(m), 0);
-
     if (n == sizeof(m)){
         write_log(m.id_mittente, m.dato);
+        char *ok="ok";
+        ssize_t s = send(client_fd,ok,strlen(ok)+1,0);
+        if(s>0){
+            printf("messaggio mandato\n");
+        }else{
+            printf("sigpipe\n");
+            write_log_dis(m.id_mittente);
+        }
+
     }
     else if (n == 0) {  //client disconnesso
         printf("client fd = %d disconnesso senza inviare dati\n", client_fd);
@@ -74,13 +133,21 @@ void* handle_client(void* arg){
 
 int main(void){
     //creazione socket lato server, sempre in ascolto
+    signal(SIGPIPE, SIG_IGN);
+
+    signal(SIGALRM, singalarm);
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET: usa ipv4, SOCK_STREAM: usa tcp, 0: protocollo scelto automaticamente
     if (listen_fd < 0) {
         perror("socket() fallita");
         exit(1);
     }
     printf("server socket creato correttamente. fd = %d\n", listen_fd);
-
+    
+    int opt = 1;
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0){
+        perror("setsockopt SO_REUSEADDR fallita");
+        exit(1);
+    }
     //preparazione indirizzo socket
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET; //stesso protocollo (ipv4) usato per la creazione del socket
@@ -103,7 +170,7 @@ int main(void){
     }
     printf("coordinator in ascolto sulla porta %d... \n", PORT);
 
-
+    alarm(5);
 
     while (1){ //loop per continuare ad accettare connessioni
         //accept(), accetta connessioni arrivate al socket.
@@ -139,7 +206,7 @@ int main(void){
 
     }
 
-
+    
     close(listen_fd);
     return 0;
 }
