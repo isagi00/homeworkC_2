@@ -11,6 +11,7 @@ direttore di orchestra.
 */
 
 #include "common.h"
+#include "logger.h"
 #include "worker.h"
 
 #include <stdio.h>  //util
@@ -91,6 +92,11 @@ int main(void){
     }
     printf("coordinator in ascolto sulla porta %d... \n", PORT);
 
+    //apertura file di log
+    if (logger_init() != 0){   
+        fprintf(stderr, "apertura file di log fallita\n");
+        exit(4);
+    }   
 
     //loop principale, continua ad accettare connessioni affinché non si ha SIGINT
     while (!shutdown_requested){ 
@@ -124,26 +130,27 @@ int main(void){
         }
         printf("creato thread %p per il client fd %d\n", (void *)tid, client_fd);
 
-        //per il thread creato aggiungi in lista
+        //aggiungi in lista il thread creato
         pthread_mutex_lock(&thread_list_mutex);
         if (thread_count < MAX_THREADS){
             thread_ids[thread_count++] = tid;
         }
         pthread_mutex_unlock(&thread_list_mutex);
 
-
-        
-        //libera risorse usate dal thread dopo aver terminato
-        pthread_detach(tid); 
+        // //libera risorse usate dal thread dopo aver terminato
+        // pthread_detach(tid); 
     }
 
-    printf("ricevuto SIGINT, chiusra in corso: %d thread attivi...\n", thread_count);
+    printf("ricevuto SIGINT, chiusura in corso...\n");
 
-    //attendi join di tutti i thread registrati
+    //attendi join di tutti i thread registrati / creati
     for (int i = 0; i < thread_count; i++){
         pthread_join(thread_ids[i], NULL);
     }
-    printf("terminati tutti i thread, coordinator chiuso pulitamente. \n");
+    printf("terminati tutti i thread, finalizzata chiusura \n");
+
+    logger_close();
+    printf("chiuso file di log. \n");
 
     // close(listen_fd);
     return 0;

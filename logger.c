@@ -22,27 +22,37 @@ PTHREAD_MUTEX_INITIALIZER: macro, inizializza un mutex con valori di default.
 */
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER; //chiave per lock.
 
+static FILE * log_fp = NULL; //puntatore al file di log
+
 static void get_timestamp(char* buffer, size_t buffer_size){
     time_t now = time(NULL);
     strftime(buffer, buffer_size, "%d-%m-%Y %H:%M:%S", localtime(&now));    //formatta secondo %d-%m-%Y %H:%M:%S
 }
 
+int logger_init(void){
+    pthread_mutex_lock(&log_mutex);
+    log_fp = fopen(LOG_FILE, "a");
+    pthread_mutex_unlock(&log_mutex);
+    return log_fp ? 0 : -1;
+}
 
 void logger_write(int id_mittente, double dato){
     //lock
     pthread_mutex_lock(&log_mutex);
 
     //crea timestamp e scrivi nel log
-    FILE *f = fopen(LOG_FILE, "a");
-    if (f){
+    // FILE *f = fopen(LOG_FILE, "a")
+    if (log_fp){
         char ts_buffer[64];
         get_timestamp(ts_buffer, sizeof(ts_buffer));
-        fprintf(f, "[%s, %d, %.2f]\n", ts_buffer, id_mittente, dato);
-        fclose(f);
+        fprintf(log_fp, "[%s, %d, %.2f]\n", ts_buffer, id_mittente, dato);
+        fflush(log_fp);
+        // fclose(f);
     }
     else{
-        perror("server fopen log fallito");
+        fprintf(stderr, "logger: tentativo scrittura con file non aperto \n");
     }
+    
     //unlock
     pthread_mutex_unlock(&log_mutex);
 }
@@ -53,16 +63,26 @@ void logger_write_event(int id_mittente, const char* evento){
     pthread_mutex_lock(&log_mutex);
 
     //crea timestamp e scrivi nel log
-    FILE *f = fopen(LOG_FILE, "a");
-    if (f){
+    // FILE *f = fopen(LOG_FILE, "a");
+    if (log_fp){
         char ts_buffer[64];
         get_timestamp(ts_buffer, sizeof(ts_buffer));
-        fprintf(f, "[%s, %d, %s]\n", ts_buffer, id_mittente, evento);
-        fclose(f);
+        fprintf(log_fp, "[%s, %d, %s]\n", ts_buffer, id_mittente, evento);
+        fflush(log_fp);
+        // fclose(f);
     }
     else{
         perror("server fopen log fallito");
     }
     //unlock
+    pthread_mutex_unlock(&log_mutex);
+}
+
+void logger_close(void){
+    pthread_mutex_lock(&log_mutex);
+    if (log_fp){
+        fclose(log_fp);
+        log_fp = NULL;
+    }
     pthread_mutex_unlock(&log_mutex);
 }
