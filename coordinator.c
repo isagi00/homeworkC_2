@@ -46,6 +46,12 @@ void sigalrm_handler(int signo){
     alarm(5);
 }
 
+void sigpipe_handler(int signo){
+    (void)signo;
+    // printf("[handler] thread %p sta gestendo sigpipe, current_client_id = %d\n", (void* ) pthread_self(), current_client_id);
+    logger_write_event(current_client_id, "DISCONNECT");
+}
+
 int main(void){
     //registrazione handler SIGINT
     struct sigaction sa;
@@ -55,15 +61,24 @@ int main(void){
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
 
-    signal(SIGPIPE, SIG_IGN);
+    // signal(SIGPIPE, SIG_IGN);
     signal(SIGALRM, sigalrm_handler);
 
-    int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    //registrazione handler SIGPIPE
+    struct sigaction sa_pipe;
+    memset(&sa_pipe, 0, sizeof(sa_pipe));
+    sa_pipe.sa_handler = sigpipe_handler;
+    sigemptyset(&sa_pipe.sa_mask);
+    sa_pipe.sa_flags = 0;
+    sigaction(SIGPIPE, &sa_pipe, NULL);
+
+    //creazione socket lato server, sempre in ascolto
+    int listen_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET: usa ipv4, SOCK_STREAM: usa tcp, 0: protocollo scelto automaticamente
     if (listen_fd < 0) {
-        perror("socket() fallita");
+        perror("[coordinator] socket() fallita");
         exit(1);
     }
-    printf("server socket creato correttamente. fd = %d\n", listen_fd);
+    printf("[coordinator] server socket creato correttamente. fd = %d\n", listen_fd);
     listen_fd_global = listen_fd;
 
     int opt = 1;
@@ -78,21 +93,22 @@ int main(void){
     addr.sin_port = htons(PORT);
 
     if ( bind(listen_fd, (struct sockaddr*) &addr, sizeof(addr)) < 0){
-        perror("server bind() fallito");
+        perror("[coordinator] server bind() fallito");
         exit(2);
     }
-    printf("server port: %d \n", addr.sin_port);
-    printf("server ip: %d \n", addr.sin_addr.s_addr);
+    printf("[coordinator] server port: %d \n", addr.sin_port);
+    printf("[coordinator] server ip: %d \n", addr.sin_addr.s_addr);
 
     int max_connessioni_in_attesa = 5;
     if ( listen(listen_fd, max_connessioni_in_attesa) < 0){
-        perror("server listen() fallito");
+        perror("[coordinator] server listen() fallito");
         exit(3);
     }
-    printf("coordinator in ascolto sulla porta %d... \n", PORT);
+    printf("[coordinator] in ascolto sulla porta %d... \n", PORT);
 
-    if (logger_init() != 0){
-        fprintf(stderr, "apertura file di log fallita\n");
+    //apertura file di log
+    if (logger_init() != 0){   
+        fprintf(stderr, "[coordinator] apertura file di log fallita\n");
         exit(4);
     }
 
@@ -110,27 +126,31 @@ int main(void){
             if (shutdown_requested){
                 break;
             }
-            perror("server accept() fallito");
-            continue;
+            if (errno == EINTR){
+                continue; //interrotto da un segnale, ad esempio da SIGPIPE. continua ad accettare connessioni senza stampare nulla
+            }
+            perror("[coordinator] server accept() fallito");
+            continue;   //se accept fallisce prova con la prossima connessione
         }
-        printf("accettato connessione client fd = %d\n", client_fd);
+        printf("[coordinator] accettato connessione client fd = %d\n", client_fd);
 
         int* arg = malloc(sizeof(int));
         if (!arg){
-            perror("malloc() fallita");
+            perror("[coordinator] malloc() fallita");
             close(client_fd);
             continue;
         }
         *arg = client_fd;
 
-        pthread_t tid;
-        if (pthread_create(&tid, NULL, handle_client, arg) != 0){
-            perror("pthread create fallita");
+        //creazione thread
+        pthread_t tid; //id del thread
+        if (pthread_create(&tid, NULL, handle_client, arg) != 0){ //handle_client: funzione che il thread creato eseguirà, arg: argomento da passare alla funzione
+            perror("[coordinator] pthread create fallita");
             free(arg);
             close(client_fd);
             continue;
         }
-        printf("creato thread %p per il client fd %d\n", (void *)tid, client_fd);
+        printf("[coordinator] creato thread %p per il client fd %d\n", (void *)tid, client_fd);
 
         pthread_mutex_lock(&thread_list_mutex);
         if (thread_count < MAX_THREADS){
@@ -139,15 +159,15 @@ int main(void){
         pthread_mutex_unlock(&thread_list_mutex);
     }
 
-    printf("ricevuto SIGINT, chiusura in corso...\n");
+    printf("[coordinator] ricevuto SIGINT, chiusura in corso...\n");
 
     for (int i = 0; i < thread_count; i++){
         pthread_join(thread_ids[i], NULL);
     }
-    printf("terminati tutti i thread, finalizzata chiusura \n");
+    printf("[coordinator] terminati i thread\n");
 
     logger_close();
-    printf("chiuso file di log. \n");
+    printf("[coordinator] chiuso file di log \n");
 
     return 0;
 }
