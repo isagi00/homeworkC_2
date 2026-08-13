@@ -119,6 +119,7 @@ int main(void){
 
         if (rotate_requested){
             rotate_requested = 0;
+            printf("[coordinator] creando nuovo file di log... \n");
             logger_check_and_rotate();
         }
 
