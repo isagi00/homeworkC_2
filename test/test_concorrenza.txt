@@ -1,1 +1,1 @@
-./producer 1 10 & ./producer 2 20 & ./producer 3 30 & ./producer 4 40 & ./producer 5 50
+./producer 1 10 & ./producer 2 20 & ./producer 3 30 & ./producer 4 40 & ./producer 5 50 & ./producer 6 60 & ./producer 7 70 & ./producer 8 80 & ./producer 9 90 & ./producer 10 100

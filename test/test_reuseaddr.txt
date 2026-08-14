@@ -1,0 +1,6 @@
+
+
+./coordinator & sleep 1;
+kill $!; 
+sleep 0.1; 
+./coordinator

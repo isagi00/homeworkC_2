@@ -61,8 +61,15 @@ int main(void){
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
 
-    // signal(SIGPIPE, SIG_IGN);
-    signal(SIGALRM, sigalrm_handler);
+    
+    //registrazione handler SIGALRM
+    struct sigaction sa_alarm;
+    memset(&sa_alarm, 0, sizeof(sa_alarm));
+    sa_alarm.sa_handler = sigalrm_handler;
+    sigemptyset(&sa_alarm.sa_mask);
+    sa_alarm.sa_flags = 0;
+    sigaction(SIGALRM, &sa_alarm, NULL);
+    
 
     //registrazione handler SIGPIPE
     struct sigaction sa_pipe;
@@ -119,7 +126,7 @@ int main(void){
 
         if (rotate_requested){
             rotate_requested = 0;
-            printf("[coordinator] creando nuovo file di log... \n");
+            // printf("[coordinator] creando nuovo file di log... \n");
             logger_check_and_rotate();
         }
 

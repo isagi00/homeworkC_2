@@ -21,7 +21,7 @@ static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static FILE * log_fp = NULL;
 
-#define MAX_BYTE 1000
+#define MAX_LOG_SIZE_BYTES 1000
 
 static void get_timestamp(char* buffer, size_t buffer_size){
     time_t now = time(NULL);
@@ -39,6 +39,7 @@ void logger_write(int id_mittente, double dato){
     pthread_mutex_lock(&log_mutex);
 
     if (log_fp){
+        printf("[logger] scrittura dati in log in corso... \n");
         char ts_buffer[64];
         get_timestamp(ts_buffer, sizeof(ts_buffer));
         fprintf(log_fp, "[%s, %d, %.2f]\n", ts_buffer, id_mittente, dato);
@@ -55,6 +56,7 @@ void logger_write_event(int id_mittente, const char* evento){
     pthread_mutex_lock(&log_mutex);
 
     if (log_fp){
+        printf("[logger] scrittura evento in log in corso... \n");
         char ts_buffer[64];
         get_timestamp(ts_buffer, sizeof(ts_buffer));
         fprintf(log_fp, "[%s, %d, %s]\n", ts_buffer, id_mittente, evento);
@@ -73,14 +75,16 @@ void logger_check_and_rotate(void){
     struct stat info_file;
 
     if (stat(LOG_FILE, &info_file) == 0){
-        if (info_file.st_size >= MAX_BYTE){
+        if (info_file.st_size >= MAX_LOG_SIZE_BYTES){
 
-            // chiudi il file attualmente aperto PRIMA di rinominarlo
+            printf("[logger] dimensione massima superata, creando nuovo log... \n");
+            // chiudi il file attualmente aperto
             if (log_fp){
                 fclose(log_fp);
                 log_fp = NULL;
             }
 
+            //archivia il file
             char buffer[100];
             time_t now = time(NULL);
             strftime(buffer, sizeof(buffer), "%d-%m-%Y_%H-%M-%S", localtime(&now));
